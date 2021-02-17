@@ -42,7 +42,10 @@ type displayQuote struct {
 	bid           float64
 	percentChange string
 	change        float64
+	high          float64
+	low           float64
 	webURL        string
+	err           error
 }
 
 var (
@@ -52,7 +55,7 @@ var (
 	city   string
 	// http.Clients should be reused instead of created as needed.
 	client = &http.Client{
-		Timeout: 3 * time.Second,
+		Timeout: 5 * time.Second,
 	}
 	userAgent = randUserAgent()
 )
@@ -82,15 +85,21 @@ func main() {
 	for {
 		quote := <-resultsChan
 		results++
-		l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
-		line := app.StatusLine(l).DropDown(false)
-		if quote.change < 0.0 {
-			line.Color("red")
+		if quote.err != nil {
+			// just ignore errors - there is too much (no internet, timeout etc.)
 		} else {
-			line.Color("green")
+			var color string
+			l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
+			line := app.StatusLine(l).DropDown(false)
+			if quote.change < 0.0 {
+				color = "red"
+			} else {
+				color = "green"
+			}
+			line.Color(color)
+			m := fmt.Sprintf("%s - %s: %.5g %s [%.5g - %.5g]", quote.time, quote.symbol, quote.bid, quote.percentChange, quote.low, quote.high)
+			submenu.Line(m).Href(quote.webURL).Color(color)
 		}
-		m := fmt.Sprintf("%s - %s: %.5g %s", quote.time, quote.symbol, quote.bid, quote.percentChange)
-		submenu.Line(m).Href(quote.webURL)
 		// stop if we've received all quotes
 		if results == len(assets) {
 			break
@@ -107,7 +116,7 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("User-Agent", userAgent)
 	if response, err := client.Do(request); err != nil {
-		log.Println(err.Error())
+		q.err = err
 	} else {
 		var body Quotes
 		json.NewDecoder(response.Body).Decode(&body)
@@ -118,6 +127,8 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		q.bid = body[0].BidPrice
 		q.change = body[0].BidDayChange
 		q.percentChange = body[0].BidDayChangePcnt
+		q.high = body[0].HighBidPrice
+		q.low = body[0].LowBidPrice
 		q.webURL = fmt.Sprintf("%s%s.", webURL, asset)
 	}
 	ch <- &q
