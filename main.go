@@ -69,6 +69,7 @@ func init() {
 
 func main() {
 	app := bitbar.New()
+	submenu := app.NewSubMenu()
 	// get all quotes in paralel
 	resultsChan := make(chan *displayQuote)
 	for _, asset := range assets {
@@ -82,12 +83,14 @@ func main() {
 		quote := <-resultsChan
 		results++
 		l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
-		line := app.StatusLine(l)
+		line := app.StatusLine(l).DropDown(false)
 		if quote.change < 0.0 {
 			line.Color("red")
 		} else {
 			line.Color("green")
 		}
+		m := fmt.Sprintf("%s - %s: %.5g %s", quote.time, quote.symbol, quote.bid, quote.percentChange)
+		submenu.Line(m).Href(quote.webURL)
 		// stop if we've received all quotes
 		if results == len(assets) {
 			break
@@ -110,7 +113,7 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		json.NewDecoder(response.Body).Decode(&body)
 		tm := time.Unix(0, body[0].QuoteTm*int64(time.Millisecond))
 		location, _ := time.LoadLocation(city)
-		q.time = tm.In(location).Format("15:04")
+		q.time = tm.In(location).Format("15:04:05")
 		q.symbol = asset
 		q.bid = body[0].BidPrice
 		q.change = body[0].BidDayChange
