@@ -78,7 +78,7 @@ func main() {
 	tn := time.Now().In(location).Format("1504")
 	weekday := time.Now().Weekday()
 	app := bitbar.New()
-	if int(weekday) > 1 && int(weekday) < 6 && tn > ts && tn < te {
+	if int(weekday) > 0 && int(weekday) < 6 && tn > ts && tn < te {
 		submenu := app.NewSubMenu()
 		// get all quotes in paralel
 		resultsChan := make(chan *displayQuote)
@@ -93,7 +93,8 @@ func main() {
 			quote := <-resultsChan
 			results++
 			if quote.err != nil {
-				// just quietly ignore errors - there is too much (no internet, timeout etc.)
+				// just quietly ignore errors - there is too many things that can go wrong
+				// (wifi off, no internet, timeout etc.)
 			} else {
 				var color string
 				l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
@@ -113,7 +114,7 @@ func main() {
 			}
 		}
 	} else {
-		app.StatusLine("Market closed").DropDown(false)
+		app.StatusLine("Markets closed").DropDown(false)
 	}
 	app.Render()
 }
