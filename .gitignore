@@ -1,4 +1,5 @@
 go.sum
+.DS_Store
 bin/**
 env.yaml
 *.json

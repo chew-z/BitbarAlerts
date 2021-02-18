@@ -53,6 +53,7 @@ var (
 	apiURL string
 	webURL string
 	city   string
+	ts, te string
 	// http.Clients should be reused instead of created as needed.
 	client = &http.Client{
 		Timeout: 5 * time.Second,
@@ -67,43 +68,52 @@ func init() {
 	apiURL = os.Getenv("API_URL")
 	webURL = os.Getenv("WEB_URL")
 	city = os.Getenv("CITY")
+	ts = os.Getenv("TIME_START")
+	te = os.Getenv("TIME_END")
 	assets = strings.Split(os.Getenv("ASSETS"), ":")
 }
 
 func main() {
+	location, _ := time.LoadLocation(city)
+	tn := time.Now().In(location).Format("1504")
+	weekday := time.Now().Weekday()
 	app := bitbar.New()
-	submenu := app.NewSubMenu()
-	// get all quotes in paralel
-	resultsChan := make(chan *displayQuote)
-	for _, asset := range assets {
-		go getQuote(asset, resultsChan)
-	}
-	defer func() {
-		close(resultsChan)
-	}()
-	results := 0
-	for {
-		quote := <-resultsChan
-		results++
-		if quote.err != nil {
-			// just ignore errors - there is too much (no internet, timeout etc.)
-		} else {
-			var color string
-			l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
-			line := app.StatusLine(l).DropDown(false)
-			if quote.change < 0.0 {
-				color = "red"
+	if int(weekday) > 1 && int(weekday) < 6 && tn > ts && tn < te {
+		submenu := app.NewSubMenu()
+		// get all quotes in paralel
+		resultsChan := make(chan *displayQuote)
+		for _, asset := range assets {
+			go getQuote(asset, resultsChan)
+		}
+		defer func() {
+			close(resultsChan)
+		}()
+		results := 0
+		for {
+			quote := <-resultsChan
+			results++
+			if quote.err != nil {
+				// just quietly ignore errors - there is too much (no internet, timeout etc.)
 			} else {
-				color = "green"
+				var color string
+				l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
+				line := app.StatusLine(l).DropDown(false)
+				if quote.change < 0.0 {
+					color = "red"
+				} else {
+					color = "green"
+				}
+				line.Color(color)
+				m := fmt.Sprintf("%s - %s: %.5g %s [%.5g - %.5g]", quote.time, quote.symbol, quote.bid, quote.percentChange, quote.low, quote.high)
+				submenu.Line(m).Href(quote.webURL).Color(color)
 			}
-			line.Color(color)
-			m := fmt.Sprintf("%s - %s: %.5g %s [%.5g - %.5g]", quote.time, quote.symbol, quote.bid, quote.percentChange, quote.low, quote.high)
-			submenu.Line(m).Href(quote.webURL).Color(color)
+			// stop if we've received all quotes
+			if results == len(assets) {
+				break
+			}
 		}
-		// stop if we've received all quotes
-		if results == len(assets) {
-			break
-		}
+	} else {
+		app.StatusLine("Market closed").DropDown(false)
 	}
 	app.Render()
 }
