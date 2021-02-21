@@ -49,11 +49,10 @@ type displayQuote struct {
 }
 
 var (
-	assets []string
-	apiURL string
-	webURL string
-	city   string
-	ts, te string
+	assets         []string
+	apiURL, webURL string
+	city           string
+	ts, te         string
 	// http.Clients should be reused instead of created as needed.
 	client = &http.Client{
 		Timeout: 5 * time.Second,
@@ -62,6 +61,7 @@ var (
 )
 
 func init() {
+	// Must be full path cause bitbar ignore user enviroment and I want separate code from env variables
 	if err := godotenv.Load("/Users/rrj/Projekty/Go/src/Bitbar/env.yaml"); err != nil {
 		log.Fatal("Error loading env file")
 	}
@@ -88,6 +88,7 @@ func main() {
 		defer func() {
 			close(resultsChan)
 		}()
+		// process results
 		results := 0
 		for {
 			quote := <-resultsChan
@@ -97,7 +98,7 @@ func main() {
 				// (wifi off, no internet, timeout etc.)
 			} else {
 				var color string
-				l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
+				l := fmt.Sprintf("%s: %.5g %.5g", quote.symbol, quote.bid, quote.change)
 				line := app.StatusLine(l).DropDown(false)
 				if quote.change < 0.0 {
 					color = "red"
@@ -105,7 +106,7 @@ func main() {
 					color = "green"
 				}
 				line.Color(color)
-				m := fmt.Sprintf("%s - %s: %.5g %s [%.5g - %.5g]", quote.time, quote.symbol, quote.bid, quote.percentChange, quote.low, quote.high)
+				m := fmt.Sprintf("%s - %s: %.5g %s", quote.time, quote.symbol, quote.bid, quote.percentChange)
 				submenu.Line(m).Href(quote.webURL).Color(color)
 			}
 			// stop if we've received all quotes
@@ -126,9 +127,7 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 	apiURL := fmt.Sprintf("%s%s.", apiURL, asset)
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("User-Agent", userAgent)
-	if response, err := client.Do(request); err != nil {
-		q.err = err
-	} else {
+	if response, err := client.Do(request); err == nil {
 		var body Quotes
 		json.NewDecoder(response.Body).Decode(&body)
 		tm := time.Unix(0, body[0].QuoteTm*int64(time.Millisecond))
@@ -140,7 +139,9 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		q.percentChange = body[0].BidDayChangePcnt
 		q.high = body[0].HighBidPrice
 		q.low = body[0].LowBidPrice
-		q.webURL = fmt.Sprintf("%s%s.", webURL, asset)
+		q.webURL = fmt.Sprintf("%s?a=%s", webURL, asset)
+	} else {
+		q.err = err
 	}
 	ch <- &q
 }
