@@ -105,7 +105,9 @@ func main() {
 				}
 				line.Color(color)
 				m := fmt.Sprintf("%s - %s: %.5g %.5g", quote.time, quote.symbol, quote.bid, quote.change)
+				a := fmt.Sprintf("%s: %.5g %s [%.5g - %.5g]", quote.symbol, quote.bid, quote.percentChange, quote.low, quote.high)
 				submenu.Line(m).Href(quote.webURL).Color(color)
+				submenu.Line(a).Alternate(true).Href(quote.webURL).Color(color)
 			}
 			// stop if we've received all quotes
 			if results == len(assets) {
