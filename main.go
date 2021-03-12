@@ -3,14 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/johnmccabe/go-bitbar"
-	"github.com/joho/godotenv"
+	_ "github.com/joho/godotenv/autoload"
 )
 
 /*Quotes - ..
@@ -49,10 +48,17 @@ type displayQuote struct {
 }
 
 var (
-	assets         []string
-	apiURL, webURL string
-	city           string
-	ts, te         string
+	// assets         []string
+	// apiURL, webURL string
+	// city           string
+	// ts, te         string
+	apiURL = os.Getenv("API_URL")
+	webURL = os.Getenv("WEB_URL")
+	city   = os.Getenv("CITY")
+	ts     = os.Getenv("TIME_START")
+	te     = os.Getenv("TIME_END")
+	assets = strings.Split(os.Getenv("ASSETS"), ":")
+
 	// http.Clients should be reused instead of created as needed.
 	client = &http.Client{
 		Timeout: 5 * time.Second,
@@ -61,16 +67,6 @@ var (
 )
 
 func init() {
-	// Must be full path cause bitbar ignore user enviroment and I want separate code from env variables
-	if err := godotenv.Load("/Users/rrj/Projekty/Go/src/Bitbar/env.yaml"); err != nil {
-		log.Fatal("Error loading env file")
-	}
-	apiURL = os.Getenv("API_URL")
-	webURL = os.Getenv("WEB_URL")
-	city = os.Getenv("CITY")
-	ts = os.Getenv("TIME_START")
-	te = os.Getenv("TIME_END")
-	assets = strings.Split(os.Getenv("ASSETS"), ":")
 }
 
 func main() {
@@ -96,9 +92,11 @@ func main() {
 			if quote.err != nil {
 				// just quietly ignore errors - there is too many things that can go wrong
 				// (wifi off, no internet, timeout etc.)
+				// log.Println(quote.err.Error())
+				submenu.Line(quote.err.Error()).Color("red")
 			} else {
 				var color string
-				l := fmt.Sprintf("%s: %.5g %.5g", quote.symbol, quote.bid, quote.change)
+				l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
 				line := app.StatusLine(l).DropDown(false)
 				if quote.change < 0.0 {
 					color = "red"
@@ -106,7 +104,7 @@ func main() {
 					color = "green"
 				}
 				line.Color(color)
-				m := fmt.Sprintf("%s - %s: %.5g %s", quote.time, quote.symbol, quote.bid, quote.percentChange)
+				m := fmt.Sprintf("%s - %s: %.5g %.5g", quote.time, quote.symbol, quote.bid, quote.change)
 				submenu.Line(m).Href(quote.webURL).Color(color)
 			}
 			// stop if we've received all quotes
