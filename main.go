@@ -48,20 +48,16 @@ type displayQuote struct {
 }
 
 var (
-	// assets         []string
-	// apiURL, webURL string
-	// city           string
-	// ts, te         string
 	apiURL = os.Getenv("API_URL")
 	webURL = os.Getenv("WEB_URL")
 	city   = os.Getenv("CITY")
-	ts     = os.Getenv("TIME_START")
-	te     = os.Getenv("TIME_END")
+	ts     = strings.Split(os.Getenv("TIME_START"), ":")
+	te     = strings.Split(os.Getenv("TIME_END"), ":")
 	assets = strings.Split(os.Getenv("ASSETS"), ":")
 
 	// http.Clients should be reused instead of created as needed.
 	client = &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 4 * time.Second,
 	}
 	userAgent = randUserAgent()
 )
@@ -74,12 +70,16 @@ func main() {
 	tn := time.Now().In(location).Format("1504")
 	weekday := time.Now().Weekday()
 	app := bitbar.New()
-	if int(weekday) > 0 && int(weekday) < 6 && tn > ts && tn < te {
+	if int(weekday) > 0 && int(weekday) < 6 {
 		submenu := app.NewSubMenu()
 		// get all quotes in paralel
 		resultsChan := make(chan *displayQuote)
-		for _, asset := range assets {
-			go getQuote(asset, resultsChan)
+		activeAssets := 0
+		for i, asset := range assets {
+			if tn > ts[i] && tn < te[i] {
+				activeAssets++
+				go getQuote(asset, resultsChan)
+			}
 		}
 		defer func() {
 			close(resultsChan)
@@ -93,7 +93,7 @@ func main() {
 				// just quietly ignore errors - there is too many things that can go wrong
 				// (wifi off, no internet, timeout etc.)
 				// log.Println(quote.err.Error())
-				submenu.Line(quote.err.Error()).Color("red")
+				submenu.Line(quote.err.Error()).Color("red").Length(25)
 			} else {
 				var color string
 				l := fmt.Sprintf("%s: %.5g %s", quote.symbol, quote.bid, quote.percentChange)
@@ -110,7 +110,7 @@ func main() {
 				submenu.Line(a).Alternate(true).Href(quote.webURL).Color(color)
 			}
 			// stop if we've received all quotes
-			if results == len(assets) {
+			if results == activeAssets {
 				break
 			}
 		}
