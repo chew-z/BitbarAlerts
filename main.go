@@ -81,11 +81,16 @@ func main() {
 				go getQuote(asset, resultsChan)
 			}
 		}
+		// process results
+		results := 0
+		if activeAssets == 0 {
+			app.StatusLine("Markets closed").DropDown(false)
+			goto AppRender
+		}
+
 		defer func() {
 			close(resultsChan)
 		}()
-		// process results
-		results := 0
 		for {
 			quote := <-resultsChan
 			results++
@@ -115,8 +120,9 @@ func main() {
 			}
 		}
 	} else {
-		app.StatusLine("Markets closed").DropDown(false)
+		app.StatusLine("Weekend - Markets closed").DropDown(false)
 	}
+AppRender:
 	app.Render()
 }
 

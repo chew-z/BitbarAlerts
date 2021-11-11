@@ -1,4 +1,4 @@
-module Bitbar
+module BitbarAlerts
 
 go 1.17
 
