@@ -57,7 +57,7 @@ var (
 
 	// http.Clients should be reused instead of created as needed.
 	client = &http.Client{
-		Timeout: 4 * time.Second,
+		Timeout: 3 * time.Second,
 	}
 	userAgent = randUserAgent()
 )
