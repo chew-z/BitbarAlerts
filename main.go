@@ -133,6 +133,7 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 	apiURL := fmt.Sprintf("%s%s.", apiURL, asset)
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("User-Agent", userAgent)
+	request.Header.Set("Connection", "close")
 	if response, err := client.Do(request); err == nil {
 		var body Quotes
 		json.NewDecoder(response.Body).Decode(&body)
@@ -146,6 +147,9 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		q.high = body[0].HighBidPrice
 		q.low = body[0].LowBidPrice
 		q.webURL = fmt.Sprintf("%s?a=%s", webURL, asset)
+		// No such host error on MacOS - due to limit of open connections
+		response.Body.Close()
+		request.Body.Close()
 	} else {
 		q.err = err
 	}
