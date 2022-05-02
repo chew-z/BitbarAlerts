@@ -1,14 +1,18 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/johnmccabe/go-bitbar"
+	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv/autoload"
 )
 
@@ -55,14 +59,26 @@ var (
 	te     = strings.Split(os.Getenv("TIME_END"), ":")
 	assets = strings.Split(os.Getenv("ASSETS"), ":")
 
+	transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		Dial: (&net.Dialer{
+			Timeout:   0,
+			KeepAlive: 0,
+		}).Dial,
+		TLSHandshakeTimeout: 3 * time.Second,
+	}
 	// http.Clients should be reused instead of created as needed.
 	client = &http.Client{
-		Timeout: 3 * time.Second,
+		Transport: transport,
+		Timeout:   5 * time.Second,
 	}
 	userAgent = randUserAgent()
 )
 
 func init() {
+	if err := godotenv.Load("/Users/rrj/Projekty/Swiftbar/.env"); err != nil {
+		log.Fatalln("Error loading .env file")
+	}
 }
 
 func main() {
@@ -148,8 +164,7 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		q.low = body[0].LowBidPrice
 		q.webURL = fmt.Sprintf("%s?a=%s", webURL, asset)
 		// No such host error on MacOS - due to limit of open connections
-		response.Body.Close()
-		request.Body.Close()
+		defer response.Body.Close()
 	} else {
 		q.err = err
 	}
