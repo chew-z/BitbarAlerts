@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -52,12 +51,7 @@ type displayQuote struct {
 }
 
 var (
-	apiURL = os.Getenv("API_URL")
-	webURL = os.Getenv("WEB_URL")
-	city   = os.Getenv("CITY")
-	ts     = strings.Split(os.Getenv("TIME_START"), ":")
-	te     = strings.Split(os.Getenv("TIME_END"), ":")
-	assets = strings.Split(os.Getenv("ASSETS"), ":")
+	myEnv map[string]string
 
 	transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -76,12 +70,19 @@ var (
 )
 
 func init() {
-	if err := godotenv.Load("/Users/rrj/Projekty/Swiftbar/.env"); err != nil {
+	var err error
+	myEnv, err = godotenv.Read("/Users/rrj/Projekty/Swiftbar/.env")
+	if err != nil {
 		log.Fatalln("Error loading .env file")
 	}
 }
 
 func main() {
+	log.Println(myEnv)
+	ts := strings.Split(myEnv["TIME_START"], ":")
+	te := strings.Split(myEnv["TIME_END"], ":")
+	assets := strings.Split(myEnv["ASSETS"], ":")
+	city := myEnv["CITY"]
 	location, _ := time.LoadLocation(city)
 	tn := time.Now().In(location).Format("1504")
 	weekday := time.Now().Weekday()
@@ -146,7 +147,9 @@ AppRender:
  */
 func getQuote(asset string, ch chan<- *displayQuote) {
 	var q displayQuote
-	apiURL := fmt.Sprintf("%s%s.", apiURL, asset)
+	city := myEnv["CITY"]
+	webURL := myEnv["WEB_URL"]
+	apiURL := fmt.Sprintf("%s%s.", myEnv["API_URL"], asset)
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("User-Agent", userAgent)
 	request.Header.Set("Connection", "close")
