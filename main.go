@@ -51,38 +51,39 @@ type displayQuote struct {
 }
 
 var (
-	myEnv map[string]string
+	myConfig map[string]string
 
 	transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		Dial: (&net.Dialer{
-			Timeout:   0,
-			KeepAlive: 0,
+			Timeout:   3500 * time.Millisecond,
+			KeepAlive: 15 * time.Second,
+			Deadline:  time.Now().Add(3 * time.Second),
 		}).Dial,
-		TLSHandshakeTimeout: 3 * time.Second,
+		TLSHandshakeTimeout: 1500 * time.Millisecond,
 	}
 	// http.Clients should be reused instead of created as needed.
 	client = &http.Client{
 		Transport: transport,
-		Timeout:   5 * time.Second,
+		Timeout:   5000 * time.Millisecond,
 	}
 	userAgent = randUserAgent()
 )
 
 func init() {
 	var err error
-	myEnv, err = godotenv.Read("/Users/rrj/Projekty/Swiftbar/.env")
+	myConfig, err = godotenv.Read("/Users/rrj/Projekty/Swiftbar/.env")
 	if err != nil {
 		log.Fatalln("Error loading .env file")
 	}
 }
 
 func main() {
-	log.Println(myEnv)
-	ts := strings.Split(myEnv["TIME_START"], ":")
-	te := strings.Split(myEnv["TIME_END"], ":")
-	assets := strings.Split(myEnv["ASSETS"], ":")
-	city := myEnv["CITY"]
+	log.Println(myConfig)
+	ts := strings.Split(myConfig["TIME_START"], ":")
+	te := strings.Split(myConfig["TIME_END"], ":")
+	assets := strings.Split(myConfig["ASSETS"], ":")
+	city := myConfig["CITY"]
 	location, _ := time.LoadLocation(city)
 	tn := time.Now().In(location).Format("1504")
 	weekday := time.Now().Weekday()
@@ -147,9 +148,9 @@ AppRender:
  */
 func getQuote(asset string, ch chan<- *displayQuote) {
 	var q displayQuote
-	city := myEnv["CITY"]
-	webURL := myEnv["WEB_URL"]
-	apiURL := fmt.Sprintf("%s%s.", myEnv["API_URL"], asset)
+	city := myConfig["CITY"]
+	webURL := myConfig["WEB_URL"]
+	apiURL := fmt.Sprintf("%s%s.", myConfig["API_URL"], asset)
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("User-Agent", userAgent)
 	request.Header.Set("Connection", "close")
@@ -166,7 +167,6 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		q.high = body[0].HighBidPrice
 		q.low = body[0].LowBidPrice
 		q.webURL = fmt.Sprintf("%s?a=%s", webURL, asset)
-		// No such host error on MacOS - due to limit of open connections
 		defer response.Body.Close()
 	} else {
 		q.err = err
