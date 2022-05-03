@@ -52,13 +52,13 @@ type displayQuote struct {
 
 var (
 	myConfig map[string]string
-
+	// By default, Transport caches connections for future re-use.
 	transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		Dial: (&net.Dialer{
 			Timeout:   3500 * time.Millisecond,
 			KeepAlive: 15 * time.Second,
-			Deadline:  time.Now().Add(3 * time.Second),
+			Deadline:  time.Now().Add(3600 * time.Millisecond),
 		}).Dial,
 		TLSHandshakeTimeout: 1500 * time.Millisecond,
 	}
@@ -154,6 +154,7 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 	request.Header.Set("Connection", "close")
 	if response, err := client.Do(request); err == nil {
 		var body Quotes
+		defer response.Body.Close()
 		json.NewDecoder(response.Body).Decode(&body)
 		tm := time.Unix(0, body[0].QuoteTm*int64(time.Millisecond))
 		city := myConfig["CITY"]
@@ -167,7 +168,6 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		q.low = body[0].LowBidPrice
 		webURL := myConfig["WEB_URL"]
 		q.webURL = fmt.Sprintf("%s?a=%s", webURL, asset)
-		defer response.Body.Close()
 	} else {
 		q.err = err
 	}
