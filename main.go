@@ -124,7 +124,7 @@ func main() {
 				if quote.change < 0.0 {
 					color = "red"
 				} else {
-					color = "green"
+					color = "green,white"
 				}
 				line.Color(color)
 				m := fmt.Sprintf("%s - %s: %.5g %.5g", quote.time, quote.symbol, quote.bid, quote.change)
@@ -132,7 +132,7 @@ func main() {
 				submenu.Line(m).Href(quote.webURL).Color(color)
 				submenu.Line(a).Alternate(true).Href(quote.webURL).Color(color)
 			}
-			// stop if we've received all quotes
+			// STOP if we've received all quotes
 			if results == activeAssets {
 				break
 			}
@@ -148,8 +148,6 @@ AppRender:
  */
 func getQuote(asset string, ch chan<- *displayQuote) {
 	var q displayQuote
-	city := myConfig["CITY"]
-	webURL := myConfig["WEB_URL"]
 	apiURL := fmt.Sprintf("%s%s.", myConfig["API_URL"], asset)
 	request, _ := http.NewRequest("GET", apiURL, nil)
 	request.Header.Set("User-Agent", userAgent)
@@ -158,6 +156,7 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		var body Quotes
 		json.NewDecoder(response.Body).Decode(&body)
 		tm := time.Unix(0, body[0].QuoteTm*int64(time.Millisecond))
+		city := myConfig["CITY"]
 		location, _ := time.LoadLocation(city)
 		q.time = tm.In(location).Format("15:04:05")
 		q.symbol = asset
@@ -166,6 +165,7 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		q.percentChange = body[0].BidDayChangePcnt
 		q.high = body[0].HighBidPrice
 		q.low = body[0].LowBidPrice
+		webURL := myConfig["WEB_URL"]
 		q.webURL = fmt.Sprintf("%s?a=%s", webURL, asset)
 		defer response.Body.Close()
 	} else {
