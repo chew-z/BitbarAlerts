@@ -1,0 +1,13 @@
+# <bitbar.title>feuvol3m</bitbar.title>
+# <bitbar.version>v1.0</bitbar.version>
+# <bitbar.author>chew-z</bitbar.author>
+# <bitbar.author.github>chew-z</bitbar.author.github>
+# <bitbar.desc>Quotes for watched assets</bitbar.desc>
+# <bitbar.dependencies>Golang</bitbar.dependencies>
+# <swiftbar.hideAbout>true</swiftbar.hideAbout>
+# <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
+# <swiftbar.hideLastUpdated>false</swiftbar.hideLastUpdated>
+# <swiftbar.hideDisablePlugin>true</swiftbar.hideDisablePlugin>
+# <swiftbar.hideSwiftBar>false</swiftbar.hideSwiftBar>
+# <swiftbar.refreshOnOpen>true</swiftbar.refreshOnOpen>
+# 
