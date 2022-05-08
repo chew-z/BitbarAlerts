@@ -1,18 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/johnmccabe/go-bitbar"
 	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/valyala/fasthttp"
 )
 
 /*Quotes - ..
@@ -53,28 +53,43 @@ type displayQuote struct {
 var (
 	myConfig map[string]string
 	// By default, Transport caches connections for future re-use.
-	transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		Dial: (&net.Dialer{
-			Timeout:   3500 * time.Millisecond,
-			KeepAlive: 15 * time.Second,
-			Deadline:  time.Now().Add(3600 * time.Millisecond),
+	// transport = &http.Transport{
+	// 	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// 	Dial: (&net.Dialer{
+	// 		Timeout:   3500 * time.Millisecond,
+	// 		KeepAlive: 15 * time.Second,
+	// 		Deadline:  time.Now().Add(3600 * time.Millisecond),
+	// 	}).Dial,
+	// 	TLSHandshakeTimeout: 1500 * time.Millisecond,
+	// }
+	// // http.Clients should be reused instead of created as needed.
+	// client = &http.Client{
+	// 	Transport: transport,
+	// 	Timeout:   5000 * time.Millisecond,
+	// }
+	readTimeout, _  = time.ParseDuration("800ms")
+	writeTimeout, _ = time.ParseDuration("1200ms")
+	client          = &fasthttp.Client{
+		ReadTimeout:              readTimeout,
+		WriteTimeout:             writeTimeout,
+		NoDefaultUserAgentHeader: true, // Don't send: User-Agent: fasthttp
+		Dial: (&fasthttp.TCPDialer{
+			Concurrency: 512,
 		}).Dial,
-		TLSHandshakeTimeout: 1500 * time.Millisecond,
 	}
-	// http.Clients should be reused instead of created as needed.
-	client = &http.Client{
-		Transport: transport,
-		Timeout:   5000 * time.Millisecond,
-	}
+	headerContentTypeJson = []byte("application/json")
 	userAgent = randUserAgent()
 )
 
 func init() {
 	var err error
-	myConfig, err = godotenv.Read("/Users/rrj/Projekty/Swiftbar/.env")
+	myConfig, err = godotenv.Read("/Users/rrj/Projekty/SwiftBar/.env")
 	if err != nil {
 		log.Fatalln("Error loading .env file")
+	}
+	client.TLSConfig = &tls.Config{
+		InsecureSkipVerify: true,
+		ClientSessionCache: tls.NewLRUClientSessionCache(0),
 	}
 }
 
@@ -149,13 +164,16 @@ AppRender:
 func getQuote(asset string, ch chan<- *displayQuote) {
 	var q displayQuote
 	apiURL := fmt.Sprintf("%s%s.", myConfig["API_URL"], asset)
-	request, _ := http.NewRequest("GET", apiURL, nil)
-	request.Header.Set("User-Agent", userAgent)
-	request.Header.Set("Connection", "close")
-	if response, err := client.Do(request); err == nil {
+	// request, _ := http.NewRequest("GET", apiURL, nil)
+	// request.Header.Set("User-Agent", userAgent)
+	// request.Header.Set("Connection", "close")
+	// if response, err := client.Do(request); err == nil {
+	if _, responseBody, err := fastGet(apiURL); err != nil {
 		var body Quotes
-		defer response.Body.Close()
-		json.NewDecoder(response.Body).Decode(&body)
+		r := bytes.NewReader(responseBody) //fasthttp is not providing io.reader
+		// defer response.Body.Close()
+		// json.NewDecoder(response.Body).Decode(&body)
+		json.NewDecoder(r).Decode(&body)
 		tm := time.Unix(0, body[0].QuoteTm*int64(time.Millisecond))
 		city := myConfig["CITY"]
 		location, _ := time.LoadLocation(city)
@@ -172,4 +190,23 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 		q.err = err
 	}
 	ch <- &q
+}
+
+/* fastGet - make Get request with fasthttp
+`*/
+func fastGet(url string) (int, []byte, error) {
+	request := fasthttp.AcquireRequest()
+	request.SetRequestURI(url)
+	request.Header.SetMethod(fasthttp.MethodGet)
+	request.Header.SetContentTypeBytes(headerContentTypeJson)
+	request.Header.SetUserAgent(userAgent)
+	response := fasthttp.AcquireResponse()
+	err := client.Do(request, response)
+	fasthttp.ReleaseRequest(request)
+	defer fasthttp.ReleaseResponse(response)
+	if err == nil {
+		respBody := response.Body()
+		return response.StatusCode(), respBody, nil
+	}
+	return 0, nil, err
 }
