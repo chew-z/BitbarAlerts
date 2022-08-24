@@ -1,11 +1,11 @@
 module BitbarAlerts
 
-go 1.17
+go 1.18
 
 require (
 	github.com/johnmccabe/go-bitbar v0.5.0
 	github.com/joho/godotenv v1.4.0
-	github.com/valyala/fasthttp v1.36.0
+	github.com/valyala/fasthttp v1.39.0
 )
 
 require (

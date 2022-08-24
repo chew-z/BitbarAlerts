@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 
@@ -51,34 +52,19 @@ type displayQuote struct {
 }
 
 var (
-	myConfig map[string]string
-	// By default, Transport caches connections for future re-use.
-	// transport = &http.Transport{
-	// 	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	// 	Dial: (&net.Dialer{
-	// 		Timeout:   3500 * time.Millisecond,
-	// 		KeepAlive: 15 * time.Second,
-	// 		Deadline:  time.Now().Add(3600 * time.Millisecond),
-	// 	}).Dial,
-	// 	TLSHandshakeTimeout: 1500 * time.Millisecond,
-	// }
-	// // http.Clients should be reused instead of created as needed.
-	// client = &http.Client{
-	// 	Transport: transport,
-	// 	Timeout:   5000 * time.Millisecond,
-	// }
-	readTimeout, _  = time.ParseDuration("800ms")
-	writeTimeout, _ = time.ParseDuration("1200ms")
+	myConfig        map[string]string
+	readTimeout, _  = time.ParseDuration("4800ms")
+	writeTimeout, _ = time.ParseDuration("5000ms")
 	client          = &fasthttp.Client{
 		ReadTimeout:              readTimeout,
 		WriteTimeout:             writeTimeout,
 		NoDefaultUserAgentHeader: true, // Don't send: User-Agent: fasthttp
 		Dial: (&fasthttp.TCPDialer{
-			Concurrency: 512,
+			Concurrency: 128,
 		}).Dial,
 	}
 	headerContentTypeJson = []byte("application/json")
-	userAgent = randUserAgent()
+	userAgent             = randUserAgent()
 )
 
 func init() {
@@ -94,7 +80,7 @@ func init() {
 }
 
 func main() {
-	log.Println(myConfig)
+	// log.Println(myConfig)
 	ts := strings.Split(myConfig["TIME_START"], ":")
 	te := strings.Split(myConfig["TIME_END"], ":")
 	assets := strings.Split(myConfig["ASSETS"], ":")
@@ -163,16 +149,24 @@ AppRender:
  */
 func getQuote(asset string, ch chan<- *displayQuote) {
 	var q displayQuote
+	var statusCode int
+	var respBody []byte
+	var err error
+	var errName string
 	apiURL := fmt.Sprintf("%s%s.", myConfig["API_URL"], asset)
-	// request, _ := http.NewRequest("GET", apiURL, nil)
-	// request.Header.Set("User-Agent", userAgent)
-	// request.Header.Set("Connection", "close")
-	// if response, err := client.Do(request); err == nil {
-	if _, responseBody, err := fastGet(apiURL); err != nil {
+	if statusCode, respBody, err = fastGet(apiURL); err != nil {
+		errName, _ = httpConnError(err)
+		log.Printf("%s %s", errName, err.Error())
+		if errName == "timeout" {
+			// retry once after in case of timeout
+			log.Println("retrying after timeout...")
+			statusCode, respBody, err = fastGet(apiURL)
+		}
+	}
+	// log.Printf("%s %v %v", statusCode, respBody, err)
+	if err == nil && statusCode == fasthttp.StatusOK {
 		var body Quotes
-		r := bytes.NewReader(responseBody) //fasthttp is not providing io.reader
-		// defer response.Body.Close()
-		// json.NewDecoder(response.Body).Decode(&body)
+		r := bytes.NewReader(respBody) //fasthttp is not providing io.reader
 		json.NewDecoder(r).Decode(&body)
 		tm := time.Unix(0, body[0].QuoteTm*int64(time.Millisecond))
 		city := myConfig["CITY"]
@@ -209,4 +203,27 @@ func fastGet(url string) (int, []byte, error) {
 		return response.StatusCode(), respBody, nil
 	}
 	return 0, nil, err
+}
+
+func httpConnError(err error) (string, bool) {
+	errName := ""
+	known := false
+	if err == fasthttp.ErrTimeout {
+		errName = "timeout"
+		known = true
+	} else if err == fasthttp.ErrNoFreeConns {
+		errName = "conn_limit"
+		known = true
+	} else if err == fasthttp.ErrConnectionClosed {
+		errName = "conn_close"
+		known = true
+	} else {
+		errName = reflect.TypeOf(err).String()
+		if errName == "*net.OpError" {
+			// Write and Read errors are not so often and in fact they just mean timeout problems
+			errName = "timeout"
+			known = true
+		}
+	}
+	return errName, known
 }
