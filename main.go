@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/johnmccabe/go-bitbar"
+	"github.com/chew-z/go-swiftbar"
+
 	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/valyala/fasthttp"
@@ -88,7 +89,7 @@ func main() {
 	location, _ := time.LoadLocation(city)
 	tn := time.Now().In(location).Format("1504")
 	weekday := time.Now().Weekday()
-	app := bitbar.New()
+	app := swiftbar.New()
 	if int(weekday) > 0 && int(weekday) < 6 {
 		submenu := app.NewSubMenu()
 		// get all quotes in paralel
@@ -130,7 +131,8 @@ func main() {
 				line.Color(color)
 				m := fmt.Sprintf("%s - %s: %.5g %.5g", quote.time, quote.symbol, quote.bid, quote.change)
 				a := fmt.Sprintf("%s: %.5g %s [%.5g - %.5g]", quote.symbol, quote.bid, quote.percentChange, quote.low, quote.high)
-				submenu.Line(m).Href(quote.webURL).Color(color)
+				// submenu.Line(m).Href(quote.webURL).Color(color)
+				submenu.Line(m).WebView(quote.webURL, 640, 480).Color(color)
 				submenu.Line(a).Alternate(true).Href(quote.webURL).Color(color)
 			}
 			// STOP if we've received all quotes
@@ -186,8 +188,11 @@ func getQuote(asset string, ch chan<- *displayQuote) {
 	ch <- &q
 }
 
-/* fastGet - make Get request with fasthttp
-`*/
+/*
+	fastGet - make Get request with fasthttp
+
+`
+*/
 func fastGet(url string) (int, []byte, error) {
 	request := fasthttp.AcquireRequest()
 	request.SetRequestURI(url)

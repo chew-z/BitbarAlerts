@@ -2,10 +2,12 @@ module BitbarAlerts
 
 go 1.20
 
+replace github.com/chew-z/go-swiftbar => ../go-swiftbar
+
 require (
-	github.com/johnmccabe/go-bitbar v0.5.0
+	github.com/chew-z/go-swiftbar v0.0.0-00010101000000-000000000000
 	github.com/joho/godotenv v1.5.1
-	github.com/valyala/fasthttp v1.47.0
+	github.com/valyala/fasthttp v1.48.0
 )
 
 require (
